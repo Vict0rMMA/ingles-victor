@@ -40,6 +40,8 @@ export const DEFAULT_PROFILE: Profile = {
 
 export const DEFAULT_SETTINGS: Settings = {
   voice: 'Kore',
+  avatar: 'emma',
+  showAvatar: true,
   teacherSpeaks: true,
   autoSpanish: false,
   engine: 'turn',

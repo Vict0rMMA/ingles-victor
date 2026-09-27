@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Download, Shield, Sliders, Trash2, User, Volume2 } from 'lucide-react';
+import { Download, Shield, Sliders, Smile, Trash2, User, Volume2 } from 'lucide-react';
+import { AVATARS, TeacherAvatar } from '@/components/conversation/TeacherAvatar';
 import {
   Banner,
   Button,
@@ -148,6 +149,41 @@ export default function SettingsPage() {
               ))}
             </div>
           </div>
+        </div>
+      </Card>
+
+      {/* Aspecto del profesor */}
+      <Card className="mb-4">
+        <CardHeader
+          title="Tu profesor"
+          subtitle="Quien te acompana en las conversaciones"
+          icon={<Smile className="size-4" />}
+        />
+        <div className="space-y-4 p-4 pt-3 sm:p-5 sm:pt-3">
+          <div className="grid grid-cols-4 gap-2">
+            {AVATARS.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => setSettings({ avatar: a.id })}
+                className={cx(
+                  'tap flex flex-col items-center gap-1.5 rounded-2xl border p-2.5',
+                  db.settings.avatar === a.id
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/12'
+                    : 'border-[var(--border)] bg-[var(--surface-2)]'
+                )}
+              >
+                <TeacherAvatar state="idle" look={a} size={56} />
+                <span className="text-[12px] font-medium">{a.name}</span>
+              </button>
+            ))}
+          </div>
+
+          <Toggle
+            label="Mostrar la cara del profesor"
+            description="La boca se mueve con su voz real. Apagalo si prefieres solo el texto."
+            checked={db.settings.showAvatar}
+            onChange={(v) => setSettings({ showAvatar: v })}
+          />
         </div>
       </Card>
 

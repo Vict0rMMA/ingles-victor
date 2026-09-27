@@ -252,6 +252,16 @@ li,
   }
 }
 
+@keyframes avatar-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-1.5px) scale(1.012);
+  }
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);

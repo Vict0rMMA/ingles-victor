@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { MicButton, VoiceBars, type MicState } from '@/components/conversation/MicButton';
 import { SummarySheet } from '@/components/conversation/SummarySheet';
+import { getAvatar, TeacherAvatar } from '@/components/conversation/TeacherAvatar';
 import { Transcript } from '@/components/conversation/Transcript';
 import { Banner, Button, Card, Chip, cx, Segmented } from '@/components/ui';
 import * as api from '@/lib/api';
@@ -613,6 +614,33 @@ export default function ConversationPage() {
         </Button>
       </header>
 
+      {/* Cara del profesor. En pantallas bajas se encoge para no comerse
+          la transcripcion, que es lo que el alumno necesita leer. */}
+      {settings.showAvatar ? (
+        <div className="flex shrink-0 flex-col items-center gap-1.5 pb-1 pt-4 [@media(max-height:700px)]:pt-2">
+          <div className="origin-top [@media(max-height:700px)]:scale-75">
+            <TeacherAvatar
+              state={micState}
+              look={getAvatar(settings.avatar)}
+              micLevel={level}
+              size={116}
+            />
+          </div>
+          <p className="text-[13px] font-semibold [@media(max-height:640px)]:hidden">
+            {getAvatar(settings.avatar).name}
+          </p>
+          <p className="text-[11.5px] text-[var(--fg-subtle)] [@media(max-height:640px)]:hidden">
+            {micState === 'speaking'
+              ? 'Hablando...'
+              : micState === 'thinking'
+                ? 'Pensando...'
+                : micState === 'recording' || micState === 'listening'
+                  ? 'Te escucha'
+                  : 'Tu profesor de ingles'}
+          </p>
+        </div>
+      ) : null}
+
       {/* Transcripcion */}
       <div className="scroll-area mx-auto w-full max-w-3xl flex-1 px-4 pt-4">
         {error ? (
@@ -742,6 +770,9 @@ function SetupScreen({
   clearNotice: () => void;
   sessionLimit: number;
 }) {
+  const db = useDB();
+  const avatar = getAvatar(db.settings.avatar);
+  const showAvatar = db.settings.showAvatar;
   const [starting, setStarting] = useState(false);
 
   const handleStart = async () => {
@@ -782,6 +813,13 @@ function SetupScreen({
 
       {/* Boton protagonista */}
       <Card className="mb-5 flex flex-col items-center gap-4 border-[var(--accent)]/25 bg-gradient-to-b from-[var(--accent)]/12 to-transparent px-5 py-7">
+        {showAvatar ? (
+          <div className="flex flex-col items-center gap-1">
+            <TeacherAvatar state={starting ? 'thinking' : 'idle'} look={avatar} size={124} />
+            <p className="text-[15px] font-semibold">{avatar.name}</p>
+            <p className="text-[12px] text-[var(--fg-subtle)]">Tu profesor de ingles</p>
+          </div>
+        ) : null}
         <MicButton state="idle" onPress={handleStart} disabled={starting} />
         <Button variant="primary" size="lg" full loading={starting} onClick={handleStart}>
           Start Conversation

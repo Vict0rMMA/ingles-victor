@@ -44,6 +44,45 @@ export function isUnlocked(): boolean {
   return unlocked;
 }
 
+/* ------------------------------------------------------------------ */
+/* Medidor de la voz del profesor                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Todo el audio de salida pasa por un analizador. Con eso el avatar puede
+ * mover la boca siguiendo la voz de verdad, en lugar de fingir una
+ * animacion que no cuadra con lo que se oye.
+ */
+let analyser: AnalyserNode | null = null;
+let meterData: Uint8Array<ArrayBuffer> | null = null;
+
+function outputNode(): AudioNode | null {
+  const c = audioContext();
+  if (!c) return null;
+  if (!analyser) {
+    analyser = c.createAnalyser();
+    analyser.fftSize = 256;
+    // Sin suavizado la boca tiembla; demasiado y va por detras de la voz.
+    analyser.smoothingTimeConstant = 0.55;
+    analyser.connect(c.destination);
+    meterData = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
+  }
+  return analyser;
+}
+
+/** Volumen actual de la voz del profesor, de 0 a 1. */
+export function outputLevel(): number {
+  if (!analyser || !meterData) return 0;
+  analyser.getByteTimeDomainData(meterData);
+  let peak = 0;
+  for (let i = 0; i < meterData.length; i += 1) {
+    const v = Math.abs(meterData[i] - 128) / 128;
+    if (v > peak) peak = v;
+  }
+  // La voz rara vez pasa de 0.5 de pico: escalamos para usar todo el rango.
+  return Math.min(1, peak * 2.2);
+}
+
 type Listener = (playing: boolean) => void;
 const listeners = new Set<Listener>();
 
@@ -81,7 +120,7 @@ function playFrom(offset: number): Promise<void> {
   return new Promise((resolve) => {
     const source = c.createBufferSource();
     source.buffer = currentBuffer;
-    source.connect(c.destination);
+    source.connect(outputNode() ?? c.destination);
     source.onended = () => {
       if (current === source) {
         current = null;
@@ -171,7 +210,7 @@ export class PcmStream {
 
     const source = c.createBufferSource();
     source.buffer = buffer;
-    source.connect(c.destination);
+    source.connect(outputNode() ?? c.destination);
 
     // Un pequeno colchon evita cortes cuando la red entrega los trozos a tirones.
     const now = c.currentTime;

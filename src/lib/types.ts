@@ -218,6 +218,10 @@ export interface Profile {
 
 export interface Settings {
   voice: string;
+  /** Aspecto del profesor en pantalla. */
+  avatar: string;
+  /** Mostrar la cara animada durante la conversacion. */
+  showAvatar: boolean;
   teacherSpeaks: boolean;
   autoSpanish: boolean;
   engine: 'live' | 'turn';
