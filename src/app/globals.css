@@ -1,0 +1,299 @@
+@import 'tailwindcss';
+
+/*
+ * Hover solo donde hay raton de verdad. En tactil el navegador simula un
+ * :hover que se queda pegado tras el toque, y esa es la senal mas clara de
+ * "esto es una web". Todas las reglas hover de la app usan este variant.
+ */
+@custom-variant hovered {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Tokens de color. Oscuro por defecto, claro disponible con           */
+/* data-theme="light" o por preferencia del sistema.                   */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --bg: #08090d;
+  --bg-soft: #0d0f15;
+  --surface: #12141c;
+  --surface-2: #181b25;
+  --border: #242836;
+  --border-soft: #1c1f2a;
+
+  --fg: #f2f4f8;
+  --fg-muted: #a0a6b8;
+  --fg-subtle: #6b7183;
+
+  --accent: #6c5ce7;
+  --accent-soft: #8b7cf6;
+  --accent-ink: #ffffff;
+  --accent-glow: rgba(108, 92, 231, 0.32);
+
+  --success: #2fd48f;
+  --warning: #f5a524;
+  --danger: #ff5d5d;
+  --info: #38bdf8;
+
+  --radius: 18px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 0 1px rgba(108, 92, 231, 0.35), 0 12px 40px var(--accent-glow);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --bg: #f6f7fb;
+  --bg-soft: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f1f3f9;
+  --border: #e2e5ee;
+  --border-soft: #eceff5;
+
+  --fg: #14161d;
+  --fg-muted: #5b6172;
+  --fg-subtle: #878da0;
+
+  --accent: #5b4bd6;
+  --accent-soft: #6c5ce7;
+  --accent-ink: #ffffff;
+  --accent-glow: rgba(91, 75, 214, 0.18);
+
+  --success: #12a06a;
+  --warning: #b9740a;
+  --danger: #d93b3b;
+  --info: #0b87c7;
+
+  --shadow-sm: 0 1px 2px rgba(20, 22, 29, 0.06);
+  --shadow-md: 0 10px 30px rgba(20, 22, 29, 0.08);
+  --shadow-glow: 0 0 0 1px rgba(91, 75, 214, 0.2), 0 12px 40px var(--accent-glow);
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-soft: var(--bg-soft);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-line-soft: var(--border-soft);
+  --color-fg: var(--fg);
+  --color-muted: var(--fg-muted);
+  --color-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --radius-card: var(--radius);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* ------------------------------------------------------------------ */
+/* Base movil. Cada regla quita una senal de "esto es una web".        */
+/* ------------------------------------------------------------------ */
+
+html {
+  -webkit-tap-highlight-color: transparent; /* sin destello gris al tocar */
+  -webkit-text-size-adjust: 100%; /* sin inflado de fuente en horizontal */
+  overscroll-behavior: none; /* sin pull-to-refresh secuestrando el scroll */
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100dvh;
+}
+
+/* 16px es el minimo: por debajo, iOS hace zoom al enfocar y no vuelve. */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+button,
+a,
+[role='button'] {
+  touch-action: manipulation; /* elimina el retardo de 300ms */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* El contenido si se puede seleccionar: son textos que el alumno copia. */
+p,
+li,
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Scrollbar discreta en escritorio */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 99px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Utilidades propias                                                   */
+/* ------------------------------------------------------------------ */
+
+@utility card {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility tap {
+  touch-action: manipulation;
+  transition: transform 120ms var(--ease-out), background-color 120ms var(--ease-out),
+    border-color 120ms var(--ease-out), opacity 120ms var(--ease-out);
+}
+
+.tap:active {
+  transform: scale(0.97);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Scroll interno que no arrastra la pagina de detras */
+.scroll-area {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ------------------------------------------------------------------ */
+/* Animaciones                                                          */
+/* ------------------------------------------------------------------ */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  70% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+@keyframes bar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 320ms var(--ease-out) both;
+}
+.animate-fade-in {
+  animation: fade-in 260ms var(--ease-out) both;
+}
+.animate-spin-slow {
+  animation: spin 900ms linear infinite;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
