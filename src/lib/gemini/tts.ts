@@ -3,6 +3,7 @@ import {
   ai,
   isModelUnavailable,
   orderedModels,
+  rememberFailure,
   rememberModel,
   TTS_MODELS,
 } from './client';
@@ -52,6 +53,7 @@ export async function speak(
     } catch (err) {
       lastError = err;
       if (!isModelUnavailable(err)) throw err;
+      rememberFailure(model);
     }
   }
   throw lastError;

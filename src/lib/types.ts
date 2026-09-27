@@ -251,10 +251,6 @@ export interface TeacherTurn {
   repeatRequest?: string;
   /** Explicacion corta en espanol cuando el alumno esta perdido. */
   spanish?: string;
-  /** Sugerencias de respuesta para que el alumno no se quede en blanco. */
-  suggestions: string[];
-  /** Palabras utiles que aparecieron en el turno. */
-  newWords: { word: string; meaningEs: string }[];
 }
 
 export interface PronunciationFeedback {

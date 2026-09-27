@@ -31,6 +31,12 @@ const correctionSchema = {
   ],
 };
 
+/**
+ * Turno de conversacion. Se mantiene deliberadamente corto: cada campo extra
+ * son tokens que el alumno espera escuchando silencio. Lo que no se muestra
+ * en pantalla no se pide. El vocabulario y el resumen se calculan al final
+ * de la sesion, no en cada turno.
+ */
 export const teacherTurnSchema = {
   type: Type.OBJECT,
   properties: {
@@ -49,24 +55,8 @@ export const teacherTurnSchema = {
       type: Type.STRING,
       description: 'Short Spanish explanation only when requested or clearly needed, else empty',
     },
-    suggestions: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description: 'Two short example answers the student could give',
-    },
-    newWords: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          word: { type: Type.STRING },
-          meaningEs: { type: Type.STRING },
-        },
-        required: ['word', 'meaningEs'],
-      },
-    },
   },
-  required: ['transcript', 'reply', 'corrections', 'suggestions', 'newWords'],
+  required: ['transcript', 'reply', 'corrections'],
 };
 
 export const summarySchema = {

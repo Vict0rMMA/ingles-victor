@@ -4,6 +4,7 @@ import {
   ai,
   isModelUnavailable,
   orderedModels,
+  rememberFailure,
   rememberModel,
   TEXT_MODELS,
 } from './client';
@@ -16,6 +17,14 @@ interface JSONRequest {
   schema: unknown;
   temperature?: number;
   maxOutputTokens?: number;
+  /** Cadena de modelos propia. Por defecto, la de calidad. */
+  models?: string[];
+  /**
+   * Cuanto puede "pensar" el modelo antes de responder. En la conversacion
+   * hablada se usa MINIMAL: el razonamiento largo no mejora una correccion
+   * sencilla y si anade segundos de espera.
+   */
+  thinkingLevel?: 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH';
 }
 
 /**
@@ -23,7 +32,7 @@ interface JSONRequest {
  * si el configurado no esta disponible en la cuenta.
  */
 export async function generateJSON<T>(req: JSONRequest): Promise<T> {
-  const chain = orderedModels(req.role, TEXT_MODELS);
+  const chain = orderedModels(req.role, req.models ?? TEXT_MODELS);
   let lastError: unknown = new Error('No hay modelos de texto configurados.');
 
   for (const model of chain) {
@@ -37,6 +46,9 @@ export async function generateJSON<T>(req: JSONRequest): Promise<T> {
           responseSchema: req.schema as never,
           temperature: req.temperature ?? 0.7,
           maxOutputTokens: req.maxOutputTokens ?? 4096,
+          ...(req.thinkingLevel
+            ? { thinkingConfig: { thinkingLevel: req.thinkingLevel as never } }
+            : {}),
         },
       });
 
@@ -55,6 +67,9 @@ export async function generateJSON<T>(req: JSONRequest): Promise<T> {
     } catch (err) {
       lastError = err;
       if (!isModelUnavailable(err)) throw err;
+      // Saturado o sin acceso: lo dejamos descansar para no pagar su
+      // espera otra vez en el siguiente turno.
+      rememberFailure(model);
     }
   }
   throw lastError;

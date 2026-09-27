@@ -46,22 +46,36 @@ export function aiAlpha(): GoogleGenAI {
 /**
  * Cadenas de modelos. Se intenta el primero y, si la cuenta no tiene acceso,
  * se cae al siguiente. Asi la app no se rompe si un modelo cambia de nombre.
+ *
+ * Hay dos cadenas de texto a proposito: en una conversacion hablada cada
+ * segundo se nota, mientras que generar un texto de lectura puede tardar.
  */
-// gemini-3.5-flash va primero por estabilidad: 3.8-flash devuelve 503 con
-// frecuencia por saturacion, y en una conversacion hablada la latencia manda.
+
+/** Conversacion: prima la latencia. Medido en ~1.5s frente a 8s+ del resto. */
+export const CHAT_MODELS: string[] = dedupe([
+  process.env.GEMINI_CHAT_MODEL,
+  'gemini-3.5-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
+]);
+
+/** Ejercicios y analisis: prima la calidad, la espera es aceptable. */
 export const TEXT_MODELS: string[] = dedupe([
   process.env.GEMINI_TEXT_MODEL,
   'gemini-3.5-flash',
   'gemini-3.8-flash',
   'gemini-3.6-flash',
-  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
 ]);
 
+// flash-lite-tts va primero: mide ~3.2s frente a ~4.8s del 2.5, y el
+// 3.8-flash-tts agota la cuota del plan gratuito enseguida.
 export const TTS_MODELS: string[] = dedupe([
   process.env.GEMINI_TTS_MODEL,
+  'gemini-3.8-flash-lite-tts',
   'gemini-3.8-flash-tts',
   'gemini-2.5-flash-preview-tts',
-  'gemini-2.5-pro-preview-tts',
 ]);
 
 export const LIVE_MODELS: string[] = dedupe([
@@ -83,14 +97,41 @@ function dedupe(list: (string | undefined)[]): string[] {
 /** Recordamos que modelo funciono para no repetir intentos fallidos. */
 const working = new Map<string, string>();
 
+/**
+ * Y recordamos cual acaba de fallar. Sin esto, un modelo saturado se
+ * reintentaba en cada turno y su 503 se sumaba a la espera del alumno
+ * una y otra vez. Cinco minutos bastan para que se recupere.
+ */
+const COOLDOWN_MS = 5 * 60_000;
+const failed = new Map<string, number>();
+
 export function rememberModel(role: string, model: string) {
   working.set(role, model);
+  failed.delete(model);
+}
+
+export function rememberFailure(model: string) {
+  failed.set(model, Date.now());
+}
+
+function inCooldown(model: string): boolean {
+  const at = failed.get(model);
+  if (!at) return false;
+  if (Date.now() - at > COOLDOWN_MS) {
+    failed.delete(model);
+    return false;
+  }
+  return true;
 }
 
 export function orderedModels(role: string, chain: string[]): string[] {
   const good = working.get(role);
-  if (!good) return chain;
-  return [good, ...chain.filter((m) => m !== good)];
+  const ordered = good ? [good, ...chain.filter((m) => m !== good)] : chain;
+  // Los que acaban de fallar van al final, pero no se descartan: si todos
+  // estan en cuarentena hay que intentarlo igualmente.
+  const ready = ordered.filter((m) => !inCooldown(m));
+  const resting = ordered.filter((m) => inCooldown(m));
+  return [...ready, ...resting];
 }
 
 /**
@@ -111,7 +152,12 @@ export function isModelUnavailable(err: unknown): boolean {
     msg.includes('503') ||
     msg.includes('unavailable') ||
     msg.includes('overloaded') ||
-    msg.includes('high demand')
+    msg.includes('high demand') ||
+    // La cuota se agota por modelo, no por proyecto: otro modelo de la
+    // cadena suele seguir disponible.
+    msg.includes('429') ||
+    msg.includes('resource_exhausted') ||
+    msg.includes('quota')
   );
 }
 

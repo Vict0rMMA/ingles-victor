@@ -1,4 +1,5 @@
 import type { Content, Part } from '@google/genai';
+import { CHAT_MODELS } from '@/lib/gemini/client';
 import { buildTeacherSystemPrompt, turnInstruction, type TeacherContext } from '@/lib/gemini/prompts';
 import { teacherTurnSchema } from '@/lib/gemini/schemas';
 import { generateJSON, modelContent, userContent } from '@/lib/gemini/text';
@@ -64,7 +65,11 @@ export async function POST(req: Request) {
       contents,
       schema: teacherTurnSchema,
       temperature: 0.85,
-      maxOutputTokens: 4000,
+      maxOutputTokens: 2000,
+      // En una conversacion hablada la latencia es parte de la experiencia:
+      // modelo rapido y sin razonamiento largo, que aqui no aporta nada.
+      models: CHAT_MODELS,
+      thinkingLevel: 'MINIMAL',
     });
 
     return ok(sanitize(turn));
@@ -83,7 +88,5 @@ function sanitize(turn: TeacherTurn): TeacherTurn {
       .slice(0, 3),
     repeatRequest: turn.repeatRequest?.trim() || undefined,
     spanish: turn.spanish?.trim() || undefined,
-    suggestions: (turn.suggestions ?? []).filter(Boolean).slice(0, 3),
-    newWords: (turn.newWords ?? []).filter((w) => w?.word).slice(0, 4),
   };
 }

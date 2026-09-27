@@ -36,7 +36,6 @@ import { LiveSession } from '@/lib/live/session';
 import { MODES, TOPICS, modeLabel } from '@/lib/modes';
 import {
   addSession,
-  addWords,
   appendMessage,
   endConversation,
   nudgeLevel,
@@ -56,7 +55,9 @@ import type {
 type Phase = 'setup' | 'active';
 type Engine = 'turn' | 'live';
 
-const SILENCE_MS = 1800;
+// Silencio que cierra la grabacion. 1.1s es el punto donde deja de sentirse
+// una espera sin cortar a quien piensa a mitad de frase.
+const SILENCE_MS = 1100;
 const MAX_RECORD_MS = 60_000;
 const SPEECH_LEVEL = 0.07;
 
@@ -213,19 +214,8 @@ export default function ConversationPage() {
       });
 
       if (corrections.length) recordCorrections(corrections, 'conversation');
-      if (turn.newWords?.length) {
-        addWords(
-          turn.newWords.map((w) => ({
-            word: w.word,
-            meaning: '',
-            meaningEs: w.meaningEs,
-            example: '',
-          })),
-          profile.level
-        );
-      }
     },
-    [profile.level, pushMessage]
+    [pushMessage]
   );
 
   /* ------------------------------ modo turnos ------------------------------ */
@@ -249,12 +239,12 @@ export default function ConversationPage() {
           setNotice('No se escucho nada claro. Acercate al microfono e intentalo otra vez.');
         }
         applyTurn(turn, said);
-        await speakTeacher(turn.reply);
+        // La voz se genera aparte y no bloquea: el texto ya esta en pantalla
+        // y el alumno puede responder sin esperar a que termine el audio.
+        void speakTeacher(turn.reply);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error inesperado.');
         setMicState('idle');
-      } finally {
-        setMicState((s) => (s === 'thinking' ? 'idle' : s));
       }
     },
     [applyTurn, buildContext, historyPayload, speakTeacher]
@@ -487,11 +477,15 @@ export default function ConversationPage() {
 
   const onMicPress = useCallback(() => {
     if (engine === 'live') return;
-    if (micState === 'recording') void stopRecording();
-    else if (micState === 'idle') void startRecording();
-    else if (micState === 'speaking') {
+    if (micState === 'recording') {
+      void stopRecording();
+    } else if (micState === 'speaking') {
+      // Un solo toque para cortar al profesor y empezar a hablar: pedir dos
+      // era justo lo que hacia sentir lenta la conversacion.
       stopPlayback();
-      setMicState('idle');
+      void startRecording();
+    } else if (micState === 'idle') {
+      void startRecording();
     }
   }, [engine, micState, startRecording, stopRecording]);
 
