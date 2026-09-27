@@ -3,9 +3,10 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  // Hay otro package-lock.json mas arriba en el disco; sin esto Next infiere
-  // mal la raiz del proyecto al empaquetar.
-  outputFileTracingRoot: __dirname,
+  // Solo en local: hay otro package-lock.json mas arriba en el disco y Next
+  // infiere mal la raiz. En Vercel el repo ya es la raiz, y forzarla aqui
+  // puede romper el empaquetado de las funciones.
+  ...(process.env.VERCEL ? {} : { outputFileTracingRoot: process.cwd() }),
   async headers() {
     return [
       {
