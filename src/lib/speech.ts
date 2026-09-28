@@ -3,6 +3,7 @@
 import * as api from './api';
 import { ApiError } from './api';
 import { browserSpeak, browserVoiceAvailable, playWav, stopAllSpeech } from './audio/player';
+import { getCachedAudio, putCachedAudio } from './cache';
 import type { Settings } from './types';
 
 /**
@@ -51,7 +52,16 @@ export async function speakText(
   }
 
   try {
+    // Lo ya generado no se vuelve a pagar. Una palabra de vocabulario se
+    // escucha muchas veces y el TTS gratuito solo da 15 usos al dia.
+    const cached = await getCachedAudio(clean, settings.voice);
+    if (cached) {
+      await playWav(cached);
+      return { used: 'gemini', fellBack: false };
+    }
+
     const { audio } = await api.tts(clean, settings.voice);
+    void putCachedAudio(clean, settings.voice, audio);
     await playWav(audio);
     return { used: 'gemini', fellBack: false };
   } catch (err) {

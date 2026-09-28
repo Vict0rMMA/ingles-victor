@@ -5,6 +5,7 @@ import { BookOpen, Headphones, Mic, Plus, RefreshCw } from 'lucide-react';
 import { Quiz } from '@/components/practice/Quiz';
 import { Banner, Button, Card, CardHeader, Chip, LoadingBlock, PageHeader } from '@/components/ui';
 import * as api from '@/lib/api';
+import { getCachedExercise, putCachedExercise } from '@/lib/cache';
 import { QUOTA_NOTICE, speakText } from '@/lib/speech';
 import { weakTopics } from '@/lib/analytics';
 import { Mic as MicRecorder, MicError } from '@/lib/audio/mic';
@@ -26,26 +27,43 @@ export default function ReadingPage() {
   const [micRef, setMicRef] = useState<MicRecorder | null>(null);
   const [readFeedback, setReadFeedback] = useState<PronunciationFeedback | null>(null);
   const [savedWords, setSavedWords] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
 
-  const generate = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setExercise(null);
-    setReadFeedback(null);
-    setSavedWords(false);
-    try {
-      const data = await api.getReading({
-        level: db.profile.level,
-        topic: topic || undefined,
-        weakTopics: weakTopics(db),
-      });
-      setExercise(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo generar el texto.');
-    } finally {
-      setLoading(false);
-    }
-  }, [db, topic]);
+  const generate = useCallback(
+    async (options: { fresh?: boolean } = {}) => {
+      setError(null);
+      setExercise(null);
+      setReadFeedback(null);
+      setSavedWords(false);
+
+      // Si ya generamos este texto antes, lo reusamos: cuesta cero API.
+      if (!options.fresh) {
+        const cached = getCachedExercise<ReadingExercise>('reading', db.profile.level, topic);
+        if (cached) {
+          setExercise(cached);
+          setFromCache(true);
+          return;
+        }
+      }
+
+      setLoading(true);
+      setFromCache(false);
+      try {
+        const data = await api.getReading({
+          level: db.profile.level,
+          topic: topic || undefined,
+          weakTopics: weakTopics(db),
+        });
+        setExercise(data);
+        putCachedExercise('reading', db.profile.level, topic, data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudo generar el texto.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [db, topic]
+  );
 
   const listen = useCallback(async () => {
     if (!exercise) return;
@@ -153,7 +171,7 @@ export default function ReadingPage() {
                 </Chip>
               ))}
             </div>
-            <Button variant="primary" full size="lg" className="mt-4" onClick={generate}>
+            <Button variant="primary" full size="lg" className="mt-4" onClick={() => void generate()}>
               Generar texto
             </Button>
           </div>
@@ -167,10 +185,18 @@ export default function ReadingPage() {
           <Card>
             <CardHeader
               title={exercise.title}
-              subtitle={`Nivel ${db.profile.level}`}
+              subtitle={
+                fromCache
+                  ? `Nivel ${db.profile.level} · guardado, sin gastar API`
+                  : `Nivel ${db.profile.level}`
+              }
               icon={<BookOpen className="size-4" />}
               action={
-                <button onClick={generate} className="tap text-[12.5px] text-[var(--accent-soft)]">
+                <button
+                  onClick={() => void generate({ fresh: true })}
+                  className="tap text-[12.5px] text-[var(--accent-soft)]"
+                  title="Generar un texto nuevo (gasta una peticion)"
+                >
                   <RefreshCw className="size-4" />
                 </button>
               }
@@ -245,7 +271,7 @@ export default function ReadingPage() {
             <h2 className="mb-2 text-[14px] font-semibold">Comprension</h2>
             <Quiz
               questions={exercise.questions}
-              onRetry={generate}
+              onRetry={() => void generate({ fresh: true })}
               onFinish={(correct, total) => {
                 addExerciseResult({ kind: 'reading', topic: exercise.title, correct, total });
                 addSession('reading', 240);

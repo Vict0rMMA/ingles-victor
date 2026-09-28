@@ -16,6 +16,7 @@ import {
   Segmented,
 } from '@/components/ui';
 import * as api from '@/lib/api';
+import { getCachedExercise, putCachedExercise } from '@/lib/cache';
 import { QUOTA_NOTICE, speakText } from '@/lib/speech';
 import { playWav, unlockAudio } from '@/lib/audio/player';
 import { TOPICS } from '@/lib/modes';

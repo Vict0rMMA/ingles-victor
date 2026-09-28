@@ -42,6 +42,7 @@ La app está diseñada para **no inventar datos**:
 
 ### Resto de secciones
 
+- **Canciones** — 24 canciones famosas clasificadas por nivel, acento y velocidad, con el tema gramatical que practica cada una y su vocabulario clave. **No consume nada de API.** No guarda letras (tienen derechos de autor): enlaza al vídeo y a la letra original.
 - **Pronunciation** — escucha, repite, feedback sobre lo que realmente se oyó.
 - **Writing** — corrección, explicación y versión natural.
 - **Reading** — textos a tu nivel, preguntas, vocabulario y lectura en voz alta evaluada.
@@ -104,6 +105,9 @@ El plan gratuito de Gemini es generoso en texto (1.000 peticiones al día en fla
 - Si la cuota de Gemini se agota a mitad de una conversación, **la app pasa sola a la voz del dispositivo** y avisa una vez, en lugar de quedarse muda.
 - `GEMINI_API_KEY` admite **varias claves separadas por comas**. Al agotarse la cuota de una, rota a la siguiente. Como las cuotas se cuentan por proyecto de Google Cloud, hay que usar claves de proyectos distintos para que sumen.
 - Un modelo que devuelve 503 o 429 queda **5 minutos en cuarentena**, para no pagar su espera en cada turno.
+- **Caché de audio**: cada frase sintetizada se guarda en IndexedDB (120 entradas, se descartan las menos usadas). Volver a escuchar una palabra no cuesta nada.
+- **Caché de ejercicios**: el último reading, listening, grammar o vocabulary de cada nivel y tema se guarda. Volver a ese tema lo recupera gratis; el botón de recargar genera uno nuevo y avisa de que gasta una petición.
+- **Canciones**: una sección entera de práctica que no toca la API.
 - Límite de tiempo por sesión configurable (5–45 min), la conversación se cierra sola al llegar.
 - Límite de peticiones por IP en todas las rutas.
 - El audio ya generado se repite desde memoria sin volver a llamar a la API.

@@ -5,6 +5,7 @@ import { Eye, EyeOff, Headphones, Play, RefreshCw } from 'lucide-react';
 import { Quiz } from '@/components/practice/Quiz';
 import { Banner, Button, Card, CardHeader, Chip, LoadingBlock, PageHeader } from '@/components/ui';
 import * as api from '@/lib/api';
+import { getCachedExercise, putCachedExercise } from '@/lib/cache';
 import { QUOTA_NOTICE, speakText } from '@/lib/speech';
 import { weakTopics } from '@/lib/analytics';
 import { playWav, replay, unlockAudio } from '@/lib/audio/player';
@@ -22,27 +23,44 @@ export default function ListeningPage() {
   const [audioLoading, setAudioLoading] = useState(false);
   const [played, setPlayed] = useState(false);
   const [showScript, setShowScript] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generate = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setExercise(null);
-    setPlayed(false);
-    setShowScript(false);
-    try {
-      const data = await api.getListening({
-        level: db.profile.level,
-        topic: topic || undefined,
-        weakTopics: weakTopics(db),
-      });
-      setExercise(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo generar el audio.');
-    } finally {
-      setLoading(false);
-    }
-  }, [db, topic]);
+  const generate = useCallback(
+    async (options: { fresh?: boolean } = {}) => {
+      setError(null);
+      setExercise(null);
+      setPlayed(false);
+      setShowScript(false);
+
+      // Reutilizamos el ejercicio ya generado para este nivel y tema.
+      if (!options.fresh) {
+        const cached = getCachedExercise<ListeningExercise>('listening', db.profile.level, topic);
+        if (cached) {
+          setExercise(cached);
+          setFromCache(true);
+          return;
+        }
+      }
+
+      setLoading(true);
+      setFromCache(false);
+      try {
+        const data = await api.getListening({
+          level: db.profile.level,
+          topic: topic || undefined,
+          weakTopics: weakTopics(db),
+        });
+        setExercise(data);
+        putCachedExercise('listening', db.profile.level, topic, data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No se pudo generar el audio.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [db, topic]
+  );
 
   const play = useCallback(async () => {
     if (!exercise) return;
@@ -98,7 +116,7 @@ export default function ListeningPage() {
                 </Chip>
               ))}
             </div>
-            <Button variant="primary" full size="lg" className="mt-4" onClick={generate}>
+            <Button variant="primary" full size="lg" className="mt-4" onClick={() => void generate()}>
               Generar audio
             </Button>
           </div>
@@ -112,10 +130,16 @@ export default function ListeningPage() {
           <Card className="border-[var(--accent)]/25 bg-gradient-to-b from-[var(--accent)]/10 to-transparent">
             <CardHeader
               title={exercise.title}
-              subtitle={played ? 'Puedes repetirlo las veces que quieras' : 'Escucha con atencion'}
+              subtitle={
+                fromCache
+                  ? 'Guardado, sin gastar API'
+                  : played
+                    ? 'Puedes repetirlo las veces que quieras'
+                    : 'Escucha con atencion'
+              }
               icon={<Headphones className="size-4" />}
               action={
-                <button onClick={generate} className="tap text-[var(--accent-soft)]">
+                <button onClick={() => void generate()} className="tap text-[var(--accent-soft)]">
                   <RefreshCw className="size-4" />
                 </button>
               }
@@ -143,7 +167,7 @@ export default function ListeningPage() {
             <h2 className="mb-2 text-[14px] font-semibold">Preguntas</h2>
             <Quiz
               questions={exercise.questions}
-              onRetry={generate}
+              onRetry={() => void generate({ fresh: true })}
               onFinish={(correct, total) => {
                 addExerciseResult({ kind: 'listening', topic: exercise.title, correct, total });
                 addSession('listening', 240);

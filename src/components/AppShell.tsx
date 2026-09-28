@@ -13,6 +13,7 @@ import {
   LineChart,
   Mic,
   Moon,
+  Music,
   PenLine,
   Settings,
   Sparkles,
@@ -35,6 +36,7 @@ const MAIN: NavItem[] = [
 ];
 
 const PRACTICE: NavItem[] = [
+  { href: '/songs', label: 'Canciones', icon: Music },
   { href: '/pronunciation', label: 'Pronunciation', icon: Volume2 },
   { href: '/listening', label: 'Listening', icon: Headphones },
   { href: '/reading', label: 'Reading', icon: BookOpen },

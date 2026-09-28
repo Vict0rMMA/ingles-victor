@@ -8,6 +8,7 @@ import {
   Languages,
   LineChart,
   Mic,
+  Music,
   PenLine,
   Sparkles,
   TriangleAlert,
@@ -22,6 +23,12 @@ const ITEMS = [
     description: 'Habla por voz con tu profesor y recibe correcciones.',
     icon: Mic,
     highlight: true,
+  },
+  {
+    href: '/songs',
+    label: 'Canciones',
+    description: 'Aprende con canciones famosas. No gasta nada de API.',
+    icon: Music,
   },
   {
     href: '/pronunciation',

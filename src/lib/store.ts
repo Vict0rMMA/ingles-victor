@@ -170,6 +170,25 @@ export function useHydrated(): boolean {
   );
 }
 
+/**
+ * Cuanto se guarda de cada cosa.
+ *
+ * La app es de un solo usuario y todo vive en localStorage, que ronda los
+ * 5 MB. Los limites estan puestos para que el historial sea util sin que
+ * el almacenamiento crezca sin control: lo viejo se descarta solo.
+ */
+const LIMITS = {
+  conversations: 30,
+  /** Mensajes que se conservan de cada conversacion vieja. */
+  messagesPerOldConversation: 30,
+  mistakes: 250,
+  vocabulary: 500,
+  exercises: 150,
+  sessions: 250,
+  pronunciation: 100,
+  lessons: 20,
+} as const;
+
 export function uid(prefix = 'id'): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -240,7 +259,7 @@ export function recordCorrections(
         }
       }
     }
-    db.mistakes = db.mistakes.slice(0, 500);
+    db.mistakes = db.mistakes.slice(0, LIMITS.mistakes);
     return db;
   });
 }
@@ -266,7 +285,7 @@ export function startConversation(
   const id = uid('conv');
   update((db) => {
     db.conversations.unshift({ ...conv, id, messages: [], startedAt: Date.now() });
-    db.conversations = db.conversations.slice(0, 60);
+    db.conversations = db.conversations.slice(0, LIMITS.conversations);
     return db;
   });
   return id;
@@ -308,8 +327,16 @@ export function endConversation(convId: string, summary?: Conversation['summary'
         endedAt: c.endedAt,
         seconds,
       });
-      db.sessions = db.sessions.slice(0, 500);
+      db.sessions = db.sessions.slice(0, LIMITS.sessions);
     }
+
+    // De las conversaciones antiguas se conserva el resumen y el final.
+    // Lo valioso (errores, progreso, vocabulario) ya vive en otras tablas.
+    db.conversations.slice(3).forEach((old) => {
+      if (old.messages.length > LIMITS.messagesPerOldConversation) {
+        old.messages = old.messages.slice(-LIMITS.messagesPerOldConversation);
+      }
+    });
     return db;
   });
 }
@@ -339,7 +366,7 @@ export function addSession(kind: StudySession['kind'], seconds: number): void {
       endedAt: end,
       seconds,
     });
-    db.sessions = db.sessions.slice(0, 500);
+    db.sessions = db.sessions.slice(0, LIMITS.sessions);
     return db;
   });
 }
@@ -347,7 +374,7 @@ export function addSession(kind: StudySession['kind'], seconds: number): void {
 export function addExerciseResult(r: Omit<ExerciseResult, 'id' | 'ts'>): void {
   update((db) => {
     db.exercises.unshift({ ...r, id: uid('ex'), ts: Date.now() });
-    db.exercises = db.exercises.slice(0, 400);
+    db.exercises = db.exercises.slice(0, LIMITS.exercises);
 
     if (r.kind === 'grammar') {
       const g: GrammarTopicProgress | undefined = db.grammar.find((t) => t.topic === r.topic);
@@ -393,7 +420,7 @@ export function addWords(
         mastery: 0,
       });
     }
-    db.vocabulary = db.vocabulary.slice(0, 1000);
+    db.vocabulary = db.vocabulary.slice(0, LIMITS.vocabulary);
     return db;
   });
 }
@@ -422,7 +449,7 @@ export function deleteWord(id: string): void {
 export function addPronunciation(p: Omit<PronunciationPractice, 'id' | 'ts'>): void {
   update((db) => {
     db.pronunciation.unshift({ ...p, id: uid('pro'), ts: Date.now() });
-    db.pronunciation = db.pronunciation.slice(0, 300);
+    db.pronunciation = db.pronunciation.slice(0, LIMITS.pronunciation);
     return db;
   });
 }
@@ -431,7 +458,7 @@ export function saveLesson(lesson: DailyLesson): void {
   update((db) => {
     db.lessons = db.lessons.filter((l) => l.date !== lesson.date);
     db.lessons.unshift(lesson);
-    db.lessons = db.lessons.slice(0, 40);
+    db.lessons = db.lessons.slice(0, LIMITS.lessons);
     return db;
   });
 }

@@ -1,9 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { Download, Shield, Sliders, Smile, Trash2, User, Volume2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Download, PiggyBank, Shield, Sliders, Smile, Trash2, User, Volume2 } from 'lucide-react';
 import { AVATARS, TeacherAvatar } from '@/components/conversation/TeacherAvatar';
+import {
+  audioCacheSize,
+  clearAudioCache,
+  clearExerciseCache,
+  exerciseCacheSize,
+} from '@/lib/cache';
 import {
   Banner,
   Button,
@@ -46,6 +52,13 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [audioCount, setAudioCount] = useState(0);
+  const [exerciseCount, setExerciseCount] = useState(0);
+
+  useEffect(() => {
+    void audioCacheSize().then(setAudioCount);
+    setExerciseCount(exerciseCacheSize());
+  }, []);
 
   if (!hydrated) return <div className="skeleton h-64 rounded-3xl" />;
 
@@ -296,6 +309,59 @@ export default function SettingsPage() {
               La conversacion se cierra sola al llegar a este tiempo.
             </p>
           </div>
+        </div>
+      </Card>
+
+      {/* Ahorro de API */}
+      <Card className="mb-4">
+        <CardHeader
+          title="Ahorro de cuota"
+          subtitle="Lo ya generado se reutiliza en vez de volver a pedirlo"
+          icon={<PiggyBank className="size-4" />}
+        />
+        <div className="space-y-3 p-4 pt-3 sm:p-5 sm:pt-3">
+          <p className="text-[13px] leading-relaxed text-[var(--fg-muted)]">
+            El plan gratuito de Gemini da <strong>1.000 peticiones de texto al dia</strong> pero
+            solo <strong>15 de voz</strong>. La app guarda cada audio y cada ejercicio que genera,
+            asi que repetirlos no gasta nada.
+          </p>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-[var(--surface-2)] p-3">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--fg-subtle)]">
+                Audios guardados
+              </p>
+              <p className="mt-1 text-[20px] font-semibold tabular-nums">{audioCount}</p>
+            </div>
+            <div className="rounded-xl bg-[var(--surface-2)] p-3">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--fg-subtle)]">
+                Ejercicios guardados
+              </p>
+              <p className="mt-1 text-[20px] font-semibold tabular-nums">{exerciseCount}</p>
+            </div>
+          </div>
+
+          <Button
+            onClick={async () => {
+              await clearAudioCache();
+              clearExerciseCache();
+              setAudioCount(0);
+              setExerciseCount(0);
+              setMessage('Cache vaciada. Lo siguiente se generara de nuevo.');
+            }}
+          >
+            <Trash2 className="size-4" />
+            Vaciar la cache
+          </Button>
+
+          <p className="text-[12px] leading-relaxed text-[var(--fg-subtle)]">
+            Para gastar menos: usa la voz del dispositivo, repite ejercicios guardados en vez de
+            generar nuevos, y practica con las{' '}
+            <Link href="/songs" className="text-[var(--accent-soft)] underline">
+              canciones
+            </Link>
+            , que no consumen API.
+          </p>
         </div>
       </Card>
 

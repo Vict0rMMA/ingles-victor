@@ -5,6 +5,7 @@ import { GraduationCap, Languages, RefreshCw, TriangleAlert } from 'lucide-react
 import { Quiz } from '@/components/practice/Quiz';
 import { Banner, Button, Card, CardHeader, Chip, LoadingBlock, PageHeader, ProgressBar } from '@/components/ui';
 import * as api from '@/lib/api';
+import { getCachedExercise, putCachedExercise } from '@/lib/cache';
 import { topMistakes, weakTopics } from '@/lib/analytics';
 import { GRAMMAR_TOPICS } from '@/lib/modes';
 import { addExerciseResult, addSession, useDB, useHydrated } from '@/lib/store';
@@ -19,6 +20,7 @@ export default function GrammarPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [spanish, setSpanish] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
 
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get('topic');
@@ -28,12 +30,24 @@ export default function GrammarPage() {
   const weak = hydrated ? weakTopics(db, 6) : [];
 
   const generate = useCallback(
-    async (chosen?: string) => {
+    async (chosen?: string, options: { fresh?: boolean } = {}) => {
       const target = chosen ?? topic;
       setTopic(target);
-      setLoading(true);
       setError(null);
       setExercise(null);
+
+      // Un tema de gramatica ya generado sirve igual la segunda vez.
+      if (!options.fresh) {
+        const cached = getCachedExercise<GrammarExercise>('grammar', db.profile.level, target);
+        if (cached) {
+          setExercise(cached);
+          setFromCache(true);
+          return;
+        }
+      }
+
+      setLoading(true);
+      setFromCache(false);
       try {
         const data = await api.getGrammar({
           level: db.profile.level,
@@ -41,6 +55,7 @@ export default function GrammarPage() {
           frequentMistakes: topMistakes(db, 5).map((m) => `"${m.original}" -> "${m.correction}"`),
         });
         setExercise(data);
+        putCachedExercise('grammar', db.profile.level, target, data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'No se pudo generar la leccion.');
       } finally {
@@ -115,10 +130,14 @@ export default function GrammarPage() {
           <Card>
             <CardHeader
               title={exercise.topic}
-              subtitle={`Nivel ${db.profile.level}`}
+              subtitle={
+                fromCache
+                  ? `Nivel ${db.profile.level} · guardado, sin gastar API`
+                  : `Nivel ${db.profile.level}`
+              }
               icon={<GraduationCap className="size-4" />}
               action={
-                <button onClick={() => void generate()} className="tap text-[var(--accent-soft)]">
+                <button onClick={() => void generate(undefined, { fresh: true })} className="tap text-[var(--accent-soft)]" title="Generar otra leccion (gasta una peticion)">
                   <RefreshCw className="size-4" />
                 </button>
               }
@@ -170,7 +189,7 @@ export default function GrammarPage() {
             <h2 className="mb-2 text-[14px] font-semibold">Practica</h2>
             <Quiz
               questions={exercise.questions}
-              onRetry={() => void generate()}
+              onRetry={() => void generate(undefined, { fresh: true })}
               onFinish={(correct, total) => {
                 addExerciseResult({ kind: 'grammar', topic: exercise.topic, correct, total });
                 addSession('grammar', 200);
