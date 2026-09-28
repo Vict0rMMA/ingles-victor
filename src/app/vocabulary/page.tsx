@@ -16,6 +16,7 @@ import {
   Segmented,
 } from '@/components/ui';
 import * as api from '@/lib/api';
+import { QUOTA_NOTICE, speakText } from '@/lib/speech';
 import { playWav, unlockAudio } from '@/lib/audio/player';
 import { TOPICS } from '@/lib/modes';
 import {
@@ -83,8 +84,7 @@ function MyWords() {
   const speak = async (word: string) => {
     try {
       await unlockAudio();
-      const { audio } = await api.tts(word, db.settings.voice);
-      await playWav(audio);
+      await speakText(word, db.settings, { force: true });
     } catch {
       /* el fallo de audio no debe romper la lista */
     }

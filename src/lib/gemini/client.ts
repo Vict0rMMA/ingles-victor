@@ -13,34 +13,83 @@ export class MissingKeyError extends Error {
   }
 }
 
+/**
+ * GEMINI_API_KEY admite varias claves separadas por comas.
+ *
+ * Las cuotas del plan gratuito se cuentan por proyecto de Google Cloud, no
+ * por clave, asi que solo suman claves de proyectos distintos. Con dos
+ * proyectos se duplica el limite diario, que en el TTS es lo que aprieta.
+ */
+export function apiKeys(): string[] {
+  const raw = process.env.GEMINI_API_KEY ?? '';
+  const keys = raw
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (!keys.length) throw new MissingKeyError();
+  return keys;
+}
+
 export function apiKey(): string {
-  const key = process.env.GEMINI_API_KEY?.trim();
-  if (!key) throw new MissingKeyError();
-  return key;
+  return apiKeys()[active % apiKeys().length];
 }
 
 export function hasKey(): boolean {
   return Boolean(process.env.GEMINI_API_KEY?.trim());
 }
 
-let client: GoogleGenAI | null = null;
+export function keyCount(): number {
+  try {
+    return apiKeys().length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Clave en uso. Rota cuando una agota su cuota. */
+let active = 0;
+const clients = new Map<string, GoogleGenAI>();
 
 export function ai(): GoogleGenAI {
-  if (!client) client = new GoogleGenAI({ apiKey: apiKey() });
-  return client;
+  const key = apiKey();
+  let c = clients.get(key);
+  if (!c) {
+    c = new GoogleGenAI({ apiKey: key });
+    clients.set(key, c);
+  }
+  return c;
+}
+
+/**
+ * Pasa a la siguiente clave. Devuelve false cuando ya se han probado todas,
+ * para no girar en circulo indefinidamente.
+ */
+export function rotateKey(attempt: number): boolean {
+  const total = keyCount();
+  if (total < 2 || attempt >= total - 1) return false;
+  active = (active + 1) % total;
+  return true;
 }
 
 /** Los tokens efimeros solo existen en v1alpha, asi que van con su propio cliente. */
-let alphaClient: GoogleGenAI | null = null;
+const alphaClients = new Map<string, GoogleGenAI>();
 
 export function aiAlpha(): GoogleGenAI {
-  if (!alphaClient) {
-    alphaClient = new GoogleGenAI({
-      apiKey: apiKey(),
-      httpOptions: { apiVersion: 'v1alpha' },
-    });
+  const key = apiKey();
+  let c = alphaClients.get(key);
+  if (!c) {
+    c = new GoogleGenAI({ apiKey: key, httpOptions: { apiVersion: 'v1alpha' } });
+    alphaClients.set(key, c);
   }
-  return alphaClient;
+  return c;
+}
+
+/** Errores de cuota: merecen probar con otra clave, no con otro modelo. */
+export function isQuotaError(err: unknown): boolean {
+  const msg = String((err as Error)?.message ?? err).toLowerCase();
+  return (
+    msg.includes('429') || msg.includes('resource_exhausted') || msg.includes('quota')
+  );
 }
 
 /**

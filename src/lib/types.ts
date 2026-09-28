@@ -222,6 +222,11 @@ export interface Settings {
   avatar: string;
   /** Mostrar la cara animada durante la conversacion. */
   showAvatar: boolean;
+  /**
+   * 'gemini' suena mucho mejor pero el plan gratuito da 15 usos al dia.
+   * 'system' usa la voz del navegador: gratis, ilimitada e instantanea.
+   */
+  voiceMode: 'gemini' | 'system' | 'off';
   teacherSpeaks: boolean;
   autoSpanish: boolean;
   engine: 'live' | 'turn';

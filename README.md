@@ -98,12 +98,17 @@ Las demás son opcionales y están documentadas en [`.env.example`](.env.example
 
 ## Control de consumo
 
+El plan gratuito de Gemini es generoso en texto (1.000 peticiones al día en flash-lite) pero **muy justo en voz: 3 por minuto y 15 al día**. La app está construida sabiéndolo:
+
+- **Tres modos de voz** en Ajustes: *Gemini* (la más natural), *Dispositivo* (la voz del navegador: gratis, ilimitada e instantánea) y *Sin voz*.
+- Si la cuota de Gemini se agota a mitad de una conversación, **la app pasa sola a la voz del dispositivo** y avisa una vez, en lugar de quedarse muda.
+- `GEMINI_API_KEY` admite **varias claves separadas por comas**. Al agotarse la cuota de una, rota a la siguiente. Como las cuotas se cuentan por proyecto de Google Cloud, hay que usar claves de proyectos distintos para que sumen.
+- Un modelo que devuelve 503 o 429 queda **5 minutos en cuarentena**, para no pagar su espera en cada turno.
 - Límite de tiempo por sesión configurable (5–45 min), la conversación se cierra sola al llegar.
 - Límite de peticiones por IP en todas las rutas.
 - El audio ya generado se repite desde memoria sin volver a llamar a la API.
 - El repaso rápido de vocabulario funciona sin API.
-- Se puede apagar la voz del profesor para no gastar TTS.
-- Solo viajan los últimos 14 turnos de la conversación.
+- Solo viajan los últimos 14 turnos de la conversación, y el turno pide solo los campos que se muestran en pantalla.
 
 ## Privacidad
 

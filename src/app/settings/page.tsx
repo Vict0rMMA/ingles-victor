@@ -15,6 +15,7 @@ import {
   Segmented,
 } from '@/components/ui';
 import * as api from '@/lib/api';
+import { QUOTA_NOTICE, speakText } from '@/lib/speech';
 import { VOICES } from '@/lib/gemini/prompts';
 import { playWav, unlockAudio } from '@/lib/audio/player';
 import {
@@ -53,8 +54,10 @@ export default function SettingsPage() {
     setMessage(null);
     try {
       await unlockAudio();
-      const { audio } = await api.tts('Hi! I am your English teacher. Ready to practice?', voice);
-      await playWav(audio);
+      await speakText('Hi! I am your English teacher. Ready to practice?', {
+        voice,
+        voiceMode: db.settings.voiceMode === 'off' ? 'system' : db.settings.voiceMode,
+      }, { force: true });
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No se pudo reproducir la voz.');
     } finally {
@@ -195,7 +198,31 @@ export default function SettingsPage() {
           icon={<Volume2 className="size-4" />}
         />
         <div className="space-y-4 p-4 pt-3 sm:p-5 sm:pt-3">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div>
+            <Segmented
+              value={db.settings.voiceMode}
+              onChange={(v) => setSettings({ voiceMode: v, teacherSpeaks: v !== 'off' })}
+              options={[
+                { value: 'gemini', label: 'Gemini' },
+                { value: 'system', label: 'Dispositivo' },
+                { value: 'off', label: 'Sin voz' },
+              ]}
+            />
+            <p className="mt-2 text-[12px] leading-relaxed text-[var(--fg-subtle)]">
+              {db.settings.voiceMode === 'gemini'
+                ? 'La voz mas natural, pero el plan gratuito de Gemini permite 15 al dia. Al agotarse, la app pasa sola a la voz del dispositivo.'
+                : db.settings.voiceMode === 'system'
+                  ? 'Voz del propio telefono o navegador: gratis, ilimitada e instantanea. Suena menos natural.'
+                  : 'El profesor no hablara. Solo veras el texto y no se gastara nada de cuota.'}
+            </p>
+          </div>
+
+          <div
+            className={cx(
+              'grid grid-cols-2 gap-2 sm:grid-cols-4',
+              db.settings.voiceMode !== 'gemini' && 'pointer-events-none opacity-40'
+            )}
+          >
             {VOICES.map((v) => (
               <button
                 key={v.id}
@@ -217,12 +244,6 @@ export default function SettingsPage() {
             ))}
           </div>
 
-          <Toggle
-            label="El profesor habla"
-            description="Si lo apagas, solo veras el texto y no se gastara TTS."
-            checked={db.settings.teacherSpeaks}
-            onChange={(v) => setSettings({ teacherSpeaks: v })}
-          />
         </div>
       </Card>
 

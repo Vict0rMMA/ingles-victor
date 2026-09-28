@@ -2,9 +2,11 @@ import 'server-only';
 import {
   ai,
   isModelUnavailable,
+  isQuotaError,
   orderedModels,
   rememberFailure,
   rememberModel,
+  rotateKey,
   TTS_MODELS,
 } from './client';
 /**
@@ -25,35 +27,41 @@ export async function speak(
   let lastError: unknown = new Error('No hay modelos TTS configurados.');
 
   for (const model of chain) {
-    try {
-      const res = await ai().models.generateContent({
-        model,
-        contents: [{ role: 'user', parts: [{ text }] }],
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const res = await ai().models.generateContent({
+          model,
+          contents: [{ role: 'user', parts: [{ text }] }],
+          config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+            },
           },
-        },
-      });
+        });
 
-      const part = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
-      const data = part?.inlineData?.data;
-      if (!data) throw new Error('Gemini no devolvio audio.');
+        const part = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
+        const data = part?.inlineData?.data;
+        if (!data) throw new Error('Gemini no devolvio audio.');
 
-      const mime = part?.inlineData?.mimeType ?? 'audio/L16;rate=24000';
-      rememberModel('tts', model);
-      // Segun el modelo, Gemini devuelve WAV ya formado o PCM crudo.
-      // Solo hay que poner cabecera cuando viene crudo.
-      const alreadyWav = mime.toLowerCase().includes('wav');
-      return {
-        audio: alreadyWav ? data : wrapPcmInWav(data, sampleRateFromMime(mime)),
-        mimeType: 'audio/wav',
-      };
-    } catch (err) {
-      lastError = err;
-      if (!isModelUnavailable(err)) throw err;
-      rememberFailure(model);
+        const mime = part?.inlineData?.mimeType ?? 'audio/L16;rate=24000';
+        rememberModel('tts', model);
+        // Segun el modelo, Gemini devuelve WAV ya formado o PCM crudo.
+        // Solo hay que poner cabecera cuando viene crudo.
+        const alreadyWav = mime.toLowerCase().includes('wav');
+        return {
+          audio: alreadyWav ? data : wrapPcmInWav(data, sampleRateFromMime(mime)),
+          mimeType: 'audio/wav',
+        };
+      } catch (err) {
+        lastError = err;
+        // El TTS gratuito son 15 peticiones al dia: si hay otra clave,
+        // vale mucho la pena intentarlo con ella antes de rendirse.
+        if (isQuotaError(err) && rotateKey(attempt)) continue;
+        if (!isModelUnavailable(err)) throw err;
+        rememberFailure(model);
+        break;
+      }
     }
   }
   throw lastError;

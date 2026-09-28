@@ -53,14 +53,33 @@ export function TeacherAvatar({
   const thinking = state === 'thinking';
   const listening = state === 'listening' || state === 'recording';
 
-  // Boca sincronizada con la voz real del profesor.
+  /**
+   * Boca sincronizada con la voz real del profesor.
+   *
+   * La voz del sistema no pasa por el AudioContext, asi que ahi no hay
+   * volumen que leer. Cuando se detecta que no llega senal, se anima la
+   * boca con un patron de habla en vez de dejarla congelada.
+   */
   useEffect(() => {
     if (!speaking) {
       setMouth(0);
       return;
     }
-    const tick = () => {
-      setMouth(outputLevel());
+    const start = performance.now();
+    let sawAudio = false;
+
+    const tick = (now: number) => {
+      const level = outputLevel();
+      if (level > 0.02) sawAudio = true;
+
+      if (sawAudio) {
+        setMouth(level);
+      } else if (now - start > 300) {
+        // Dos ondas superpuestas dan un ritmo de habla creible.
+        const t = (now - start) / 1000;
+        const v = 0.5 + 0.34 * Math.sin(t * 11) + 0.16 * Math.sin(t * 19.3);
+        setMouth(Math.max(0.06, Math.min(1, v)));
+      }
       raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);

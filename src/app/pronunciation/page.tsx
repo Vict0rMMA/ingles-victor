@@ -5,6 +5,7 @@ import { Check, Info, Play, RefreshCw, Volume2 } from 'lucide-react';
 import { MicButton, type MicState } from '@/components/conversation/MicButton';
 import { Banner, Button, Card, CardHeader, Chip, PageHeader } from '@/components/ui';
 import * as api from '@/lib/api';
+import { QUOTA_NOTICE, speakText } from '@/lib/speech';
 import { Mic as MicRecorder, MicError } from '@/lib/audio/mic';
 import { playWav, stopPlayback, unlockAudio } from '@/lib/audio/player';
 import { addPronunciation, addSession, useDB, useHydrated } from '@/lib/store';
@@ -74,8 +75,8 @@ export default function PronunciationPage() {
     setError(null);
     try {
       await unlockAudio();
-      const { audio } = await api.tts(target, db.settings.voice);
-      await playWav(audio);
+      const r = await speakText(target, db.settings, { force: true });
+      if (r.fellBack) setError(QUOTA_NOTICE);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo reproducir el audio.');
     }

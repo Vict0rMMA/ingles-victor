@@ -20,6 +20,7 @@ import { getAvatar, TeacherAvatar } from '@/components/conversation/TeacherAvata
 import { Transcript } from '@/components/conversation/Transcript';
 import { Banner, Button, Card, Chip, cx, Segmented } from '@/components/ui';
 import * as api from '@/lib/api';
+import { QUOTA_NOTICE, speakText } from '@/lib/speech';
 import {
   frequentMistakePayload,
   weakTopics,
@@ -28,10 +29,10 @@ import {
 import { Mic as MicRecorder, MicError, requestMicPermission } from '@/lib/audio/mic';
 import {
   PcmStream,
-  playWav,
   replay as replayAudio,
-  stopPlayback,
+  stopAllSpeech,
   unlockAudio,
+  warmUpVoices,
 } from '@/lib/audio/player';
 import { LiveSession } from '@/lib/live/session';
 import { MODES, TOPICS, modeLabel } from '@/lib/modes';
@@ -95,6 +96,8 @@ export default function ConversationPage() {
   const speechRef = useRef({ spoke: false, lastLoud: 0 });
   const stoppingRef = useRef(false);
   const mutedRef = useRef(false);
+  /** Una vez agotada la cuota de voz, no insistimos el resto de la sesion. */
+  const fellBackRef = useRef(false);
 
   messagesRef.current = messages;
   mutedRef.current = muted;
@@ -155,7 +158,7 @@ export default function ConversationPage() {
       micRef.current?.stop();
       liveRef.current?.close();
       streamRef.current?.interrupt();
-      stopPlayback();
+      stopAllSpeech();
     };
   }, []);
 
@@ -168,19 +171,22 @@ export default function ConversationPage() {
 
   const speakTeacher = useCallback(
     async (text: string) => {
-      if (!settings.teacherSpeaks || mutedRef.current || !text) return;
+      if (settings.voiceMode === 'off' || mutedRef.current || !text) return;
       try {
         setMicState('speaking');
-        const { audio } = await api.tts(text, settings.voice);
-        await playWav(audio);
+        const result = await speakText(text, settings);
+        // Avisamos una sola vez de que se cambio de voz, no en cada turno.
+        if (result.fellBack && !fellBackRef.current) {
+          fellBackRef.current = true;
+          setNotice(QUOTA_NOTICE);
+        }
       } catch {
-        // Si el TTS falla la conversacion sigue: el texto ya esta en pantalla.
         setNotice('No se pudo reproducir la voz, pero puedes leer la respuesta.');
       } finally {
         setMicState((s) => (s === 'speaking' ? 'idle' : s));
       }
     },
-    [settings.teacherSpeaks, settings.voice]
+    [settings]
   );
 
   const historyPayload = useCallback(
@@ -275,7 +281,7 @@ export default function ConversationPage() {
   const startRecording = useCallback(async () => {
     setError(null);
     setNotice(null);
-    stopPlayback();
+    stopAllSpeech();
     const mic = new MicRecorder();
     speechRef.current = { spoke: false, lastLoud: Date.now() };
 
@@ -371,8 +377,11 @@ export default function ConversationPage() {
       setNotice(null);
       setMessages([]);
       setSummary(null);
+      fellBackRef.current = false;
       // Desbloquear el audio dentro del gesto del usuario: iOS lo exige.
       await unlockAudio();
+      // Chrome carga las voces del sistema de forma asincrona.
+      warmUpVoices();
 
       try {
         await requestMicPermission();
@@ -424,7 +433,7 @@ export default function ConversationPage() {
     liveRef.current?.close();
     liveRef.current = null;
     streamRef.current?.interrupt();
-    stopPlayback();
+    stopAllSpeech();
     setMicState('idle');
     setLevel(0);
 
@@ -483,7 +492,7 @@ export default function ConversationPage() {
     } else if (micState === 'speaking') {
       // Un solo toque para cortar al profesor y empezar a hablar: pedir dos
       // era justo lo que hacia sentir lenta la conversacion.
-      stopPlayback();
+      stopAllSpeech();
       void startRecording();
     } else if (micState === 'idle') {
       void startRecording();
@@ -516,7 +525,7 @@ export default function ConversationPage() {
     setMuted((m) => {
       const next = !m;
       if (next) {
-        stopPlayback();
+        stopAllSpeech();
         streamRef.current?.interrupt();
       }
       return next;
@@ -723,7 +732,7 @@ export default function ConversationPage() {
             {micState === 'speaking' ? (
               <Chip
                 onClick={() => {
-                  stopPlayback();
+                  stopAllSpeech();
                   streamRef.current?.interrupt();
                   setMicState(engine === 'live' ? 'listening' : 'idle');
                 }}

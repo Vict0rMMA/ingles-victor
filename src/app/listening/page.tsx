@@ -5,6 +5,7 @@ import { Eye, EyeOff, Headphones, Play, RefreshCw } from 'lucide-react';
 import { Quiz } from '@/components/practice/Quiz';
 import { Banner, Button, Card, CardHeader, Chip, LoadingBlock, PageHeader } from '@/components/ui';
 import * as api from '@/lib/api';
+import { QUOTA_NOTICE, speakText } from '@/lib/speech';
 import { weakTopics } from '@/lib/analytics';
 import { playWav, replay, unlockAudio } from '@/lib/audio/player';
 import { TOPICS } from '@/lib/modes';
@@ -54,9 +55,10 @@ export default function ListeningPage() {
     setAudioLoading(true);
     try {
       await unlockAudio();
-      const { audio } = await api.tts(exercise.script, db.settings.voice);
-      await playWav(audio);
-      setPlayed(true);
+      const r = await speakText(exercise.script, db.settings, { force: true });
+      if (r.fellBack) setError(QUOTA_NOTICE);
+      // La voz del dispositivo no se puede repetir sin volver a sintetizar.
+      setPlayed(r.used === 'gemini');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo reproducir el audio.');
     } finally {

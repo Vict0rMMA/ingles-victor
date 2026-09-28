@@ -42,6 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
   voice: 'Kore',
   avatar: 'emma',
   showAvatar: true,
+  voiceMode: 'gemini',
   teacherSpeaks: true,
   autoSpanish: false,
   engine: 'turn',
@@ -78,7 +79,7 @@ function read(): DB {
       ...parsed,
       version: VERSION,
       profile: { ...DEFAULT_PROFILE, ...(parsed.profile ?? {}) },
-      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+      settings: migrateSettings({ ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) }),
       conversations: parsed.conversations ?? [],
       mistakes: parsed.mistakes ?? [],
       vocabulary: parsed.vocabulary ?? [],
@@ -91,6 +92,12 @@ function read(): DB {
   } catch {
     return EMPTY_DB;
   }
+}
+
+/** Los ajustes guardados antes de existir voiceMode solo tenian teacherSpeaks. */
+function migrateSettings(s: Settings): Settings {
+  if (!s.teacherSpeaks && s.voiceMode === 'gemini') return { ...s, voiceMode: 'off' };
+  return s;
 }
 
 function ensure(): DB {

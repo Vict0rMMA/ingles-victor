@@ -5,6 +5,7 @@ import { BookOpen, Headphones, Mic, Plus, RefreshCw } from 'lucide-react';
 import { Quiz } from '@/components/practice/Quiz';
 import { Banner, Button, Card, CardHeader, Chip, LoadingBlock, PageHeader } from '@/components/ui';
 import * as api from '@/lib/api';
+import { QUOTA_NOTICE, speakText } from '@/lib/speech';
 import { weakTopics } from '@/lib/analytics';
 import { Mic as MicRecorder, MicError } from '@/lib/audio/mic';
 import { playWav, stopPlayback, unlockAudio } from '@/lib/audio/player';
@@ -51,8 +52,8 @@ export default function ReadingPage() {
     setSpeaking(true);
     try {
       await unlockAudio();
-      const { audio } = await api.tts(exercise.text, db.settings.voice);
-      await playWav(audio);
+      const r = await speakText(exercise.text, db.settings, { force: true });
+      if (r.fellBack) setError(QUOTA_NOTICE);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo generar el audio.');
     } finally {

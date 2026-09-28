@@ -247,17 +247,104 @@ export class PcmStream {
   }
 }
 
-/** Respaldo sin coste de API: la voz del propio sistema. */
-export function browserSpeak(text: string): boolean {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return false;
+/* ------------------------------------------------------------------ */
+/* Voz del sistema: gratis e ilimitada                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * El TTS de Gemini suena mucho mejor, pero el plan gratuito da 15 usos al
+ * dia. La voz del navegador no consume nada de API y responde al instante,
+ * asi que sirve tanto de modo elegido como de red de seguridad cuando la
+ * cuota se agota a mitad de una conversacion.
+ */
+export function browserVoiceAvailable(): boolean {
+  return typeof window !== 'undefined' && 'speechSynthesis' in window;
+}
+
+/** Elegimos la mejor voz inglesa disponible en el dispositivo. */
+function pickEnglishVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const english = voices.filter((v) => v.lang?.toLowerCase().startsWith('en'));
+  if (!english.length) return null;
+  // Las voces "natural"/"neural" de Windows y las locales de iOS y Android
+  // suenan bastante mejor que la predeterminada.
+  const preferred = english.find((v) => /natural|neural|enhanced|premium/i.test(v.name));
+  const us = english.find((v) => v.lang?.toLowerCase() === 'en-us');
+  return preferred ?? us ?? english[0];
+}
+
+let browserSpeaking = false;
+
+/** true mientras habla la voz del sistema (no pasa por el AudioContext). */
+export function isBrowserSpeaking(): boolean {
+  return browserSpeaking;
+}
+
+export function stopBrowserSpeech(): void {
+  if (!browserVoiceAvailable()) return;
   try {
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = 'en-US';
-    utter.rate = 0.95;
-    window.speechSynthesis.speak(utter);
-    return true;
   } catch {
-    return false;
+    /* ignorado */
+  }
+  browserSpeaking = false;
+  emit(false);
+}
+
+export function browserSpeak(text: string): Promise<void> {
+  if (!browserVoiceAvailable() || !text) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      const voice = pickEnglishVoice();
+      if (voice) utter.voice = voice;
+      utter.lang = voice?.lang ?? 'en-US';
+      // Un poco mas lento de lo normal: el alumno esta aprendiendo.
+      utter.rate = 0.94;
+      utter.pitch = 1;
+
+      const done = () => {
+        browserSpeaking = false;
+        emit(false);
+        resolve();
+      };
+      utter.onend = done;
+      utter.onerror = done;
+
+      browserSpeaking = true;
+      emit(true);
+      window.speechSynthesis.speak(utter);
+
+      // Chrome deja de hablar si la pestana pierde foco un rato; este
+      // seguro evita que la promesa se quede colgada para siempre.
+      const guard = window.setInterval(() => {
+        if (!window.speechSynthesis.speaking) {
+          window.clearInterval(guard);
+          done();
+        }
+      }, 500);
+    } catch {
+      browserSpeaking = false;
+      resolve();
+    }
+  });
+}
+
+/** Callar al profesor, venga su voz de Gemini o del propio dispositivo. */
+export function stopAllSpeech(): void {
+  stopPlayback();
+  stopBrowserSpeech();
+}
+
+/** Las voces llegan de forma asincrona en Chrome; conviene pedirlas pronto. */
+export function warmUpVoices(): void {
+  if (!browserVoiceAvailable()) return;
+  try {
+    window.speechSynthesis.getVoices();
+  } catch {
+    /* ignorado */
   }
 }
